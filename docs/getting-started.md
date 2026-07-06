@@ -33,8 +33,8 @@ class EMACrossBot(qx.BaseBot):
 
     def indicators(self, data):
         return {
-            "fast_ema": qx.ti.ema(data["close"], self.tune["fast_ema"]),
-            "slow_ema": qx.ti.ema(data["close"], self.tune["slow_ema"]),
+            "fast_ema": qx.ti.ema(data["close"], self.tune["fast_ema_period"]),
+            "slow_ema": qx.ti.ema(data["close"], self.tune["slow_ema_period"]),
         }
 
     def strategy(self, tick_info, indicators):
