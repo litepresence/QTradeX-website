@@ -7,4 +7,4 @@ building, backtesting, and deploying algorithmic trading bots.
 - **[Writing a Bot](writing-a-bot.md)** — BaseBot, tune, clamps, signals
 - **[Optimization](optimization.md)** — tune scaling, optimizers, caching
 - **[Live Trading](live-trading.md)** — dispatch, wallets, execution
-- **[API Reference](api/)** — Data, BaseBot, signals, optimizers
+- **[API Reference](api/basebot.md)** — Data, BaseBot, signals, optimizers

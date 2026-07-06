@@ -4,6 +4,9 @@ docs_dir: docs
 site_dir: gh-docs
 use_directory_urls: true
 
+exclude_docs: |
+  superpowers/
+
 theme:
   name: material
 
