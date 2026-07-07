@@ -11,6 +11,18 @@ theme:
   name: material
   features:
     - content.code.copy
+  palette:
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+extra_css:
+  - extra.css
 
 markdown_extensions:
   - pymdownx.highlight
@@ -19,14 +31,38 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Writing a Bot: writing-a-bot.md
+  - Data Deep Dive: data-deep-dive.md
+  - Advanced Bot Building: advanced-bot-building.md
+  - Custom Indicators: custom-indicators.md
+  - Candlestick Patterns: candlestick-patterns.md
+  - Iteration Tools: iteration-tools.md
   - Optimization: optimization.md
+  - Tune Management: tune-management.md
+  - Validation: validation.md
   - Live Trading: live-trading.md
+  - Smart Orders: smart-orders.md
+  - BitShares Walkthrough: bitshares-walkthrough.md
+  - Demos: demos.md
+  - Community: community.md
   - API Reference:
-      - api/data.md
-      - api/signals.md
+      - api/auto-backtest.md
       - api/basebot.md
+      - api/bitshares.md
+      - api/candlestick-patterns.md
+      - api/core.md
+      - api/data.md
+      - api/execution.md
+      - api/filltest.md
+      - api/gravitas.md
+      - api/indicators.md
+      - api/monte-carlo.md
       - api/optimizers.md
+      - api/plotting.md
+      - api/signals.md
+      - api/stock-exchange-lookup.md
+      - api/tune-management.md
+      - api/utilities.md
+      - api/wallet.md
 
 extra:
   social:
