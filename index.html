@@ -45,7 +45,7 @@
                 <h1>Build, Backtest & Optimize AI-Powered Trading Bots</h1>
                 <p>Lightning-fast Python framework for algorithmic trading. Deploy on 100+ exchanges with vectorized execution and genetic optimization.</p>
                 <div class="cta-group">
-                    <a href="https://github.com/squidKid-deluxe/QTradeX-Algo-Trading-SDK#quickstart" class="btn btn-primary">
+                    <a href="/getting-started/" class="btn btn-primary">
                         <i class="material-icons">play_arrow</i> Get Started
                     </a>
                     <a href="https://github.com/squidKid-deluxe/QTradeX-Algo-Trading-SDK" class="btn btn-secondary">
@@ -199,19 +199,18 @@
             <span class="s">"fast_ema_period"</span>: <span class="n">10.0</span>,
             <span class="s">"slow_ema_period"</span>: <span class="n">50.0</span>
         }
-        <span class="n">self</span>.clamps = [
-            <span class="c"># min, max</span>
-            [<span class="n">5</span>,   <span class="n">50</span> ], <span class="c"># fast_ema</span>
-            [<span class="n">20</span>,  <span class="n">100</span>], <span class="c"># slow_ema</span>
-        ]
+        <span class="n">self</span>.clamps = {
+            <span class="s">"fast_ema_period"</span>: [<span class="n">5</span>, <span class="n">7.5</span>, <span class="n">50</span>, <span class="n">1</span>],
+            <span class="s">"slow_ema_period"</span>: [<span class="n">20</span>, <span class="n">35</span>, <span class="n">100</span>, <span class="n">1</span>],
+        }
 
     <span class="k">def</span> <span class="f">indicators</span>(<span class="n">self</span>, <span class="n">data</span>):
         <span class="k">return</span> {
-            <span class="s">"fast_ema"</span>: qx.ti.ema(data[<span class="s">"close"</span>], <span class="n">self</span>.tune[<span class="s">"fast_ema"</span>]),
-            <span class="s">"slow_ema"</span>: qx.ti.ema(data[<span class="s">"close"</span>], <span class="n">self</span>.tune[<span class="s">"slow_ema"</span>]),
+            <span class="s">"fast_ema"</span>: qx.ti.ema(data[<span class="s">"close"</span>], <span class="n">self</span>.tune[<span class="s">"fast_ema_period"</span>]),
+            <span class="s">"slow_ema"</span>: qx.ti.ema(data[<span class="s">"close"</span>], <span class="n">self</span>.tune[<span class="s">"slow_ema_period"</span>]),
         }
 
-    <span class="k">def</span> <span class="f">strategy</span>(<span class="n">self</span>, <span class="n">tick_info</span>, <span class="n">indicators</span>):
+    <span class="k">def</span> <span class="f">strategy</span>(<span class="n">self</span>, <span class="n">state</span>, <span class="n">indicators</span>):
         <span class="n">fast</span> = indicators[<span class="s">"fast_ema"</span>]
         <span class="n">slow</span> = indicators[<span class="s">"slow_ema"</span>]
         <span class="k">if</span> <span class="n">fast</span> > <span class="n">slow</span>: <span class="k">return</span> qx.<span class="cl">Buy</span>()
