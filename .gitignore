@@ -1,2 +1,3 @@
-docs/superpowers/
-gh-docs/
+.superpowers/
+raw-docs/superpowers/
+dist/
