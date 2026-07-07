@@ -1,11 +1,8 @@
 site_name: QTradeX Docs
-site_url: https://qtradex.litepresence.com/
-docs_dir: docs
-site_dir: gh-docs
+site_url: https://qtradex.litepresence.com/docs/
+docs_dir: .
+site_dir: ../dist/docs
 use_directory_urls: true
-
-exclude_docs: |
-  superpowers/
 
 theme:
   name: material
