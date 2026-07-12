@@ -4,6 +4,11 @@
 
 ```bash
 pip install qtradex
+
+Optional extras:
+
+- `pip install qtradex[rl]` — RLPPO optimizer (installs PyTorch + stable-baselines3)
+- `pip install qtradex[bitshares]` — BitShares decentralized exchange support
 ```
 
 Published to PyPI on every release — `pip install` always gets the latest version.
