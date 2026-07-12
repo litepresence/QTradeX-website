@@ -1,5 +1,8 @@
 # QTradeX Docs
 
+!!! info "SDK commit reference"
+    These docs correspond to SDK commit [`e5f62bd`](https://github.com/squidKid-deluxe/QTradeX-Algo-Trading-SDK/commit/e5f62bd). Run `git pull` or `pip install qtradex` to ensure your SDK matches.
+
 ```python
 import qtradex as qx
 
