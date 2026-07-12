@@ -6,15 +6,15 @@ Every optimizer follows the same loop: tweak the tune, run a backtest, keep resu
 
 ## Which optimizer should you use?
 
-||QPSO|LSGA|IPSE|AION|GridSearch|MouseWheel|
-|---|---|---|---|---|---|---|
-|Best for|First pass|Overfit prevention|Deterministic search|Expensive backtests|Landscape exploration|Final polish|
-|Threading|Single|Parallel|Parallel|Single|Parallel|Single|
-|Overfit protection|No|Walk-forward + DD gate + skew|No|No|No|N/A|
-|Deterministic|No|No|Yes|No|Yes|N/A|
-|Population|No|Yes|Yes|No|Yes|N/A|
+||QPSO|LSGA|IPSE|AION|GridSearch|RLPPO|MouseWheel|
+|---|---|---|---|---|---|---|---|
+|Best for|First pass|Overfit prevention|Deterministic search|Expensive backtests|Landscape exploration|RL-based search|Final polish|
+|Threading|Single|Parallel|Parallel|Single|Parallel|Single|Single|
+|Overfit protection|No|Walk-forward + DD gate + skew|No|No|No|Walk-forward composite|N/A|
+|Requires install|—|—|—|—|—|`pip install qtradex[rl]`|`tkinter`|
+|Population|No|Yes|Yes|No|Yes|No|N/A|
 
-Quick rule of thumb: start with **QPSO**. If you see overfitting, switch to **LSGA**. If you want predictable, repeatable results, use **IPSE**. If backtests are slow and you want efficiency, run **AION**. To map the landscape coarsely, try **GridSearch**. Finish with **MouseWheelTuner** for hand-tuning.
+Quick rule of thumb: start with **QPSO**. If you see overfitting, switch to **LSGA**. If you want predictable, repeatable results, use **IPSE**. If backtests are slow and you want efficiency, run **AION**. To map the landscape coarsely, try **GridSearch**. For experimental RL-based search, try **RLPPO**. Finish with **MouseWheelTuner** for hand-tuning.
 
 ---
 
@@ -182,6 +182,128 @@ By learning which parameter regions are bad and skipping them, AION evaluates fa
 ### Single-threaded tradeoff
 
 AION runs one backtest at a time. On a big CPU, LSGA will finish faster in wall-clock time because its population evaluations run in parallel. But AION uses less total CPU time because its filter skips so many evaluations. If you have 20+ cores and the backtest is fast, LSGA is likely faster end-to-end. If compute resources are limited or the backtest is expensive, AION's efficiency wins.
+
+---
+
+## GridSearch — Random Subspace Grid Search
+
+`pip install qtradex` (included by default).
+
+### The problem it solves
+
+The other optimizers follow gradients. QPSO mutates toward better regions. LSGA breeds better populations. IPSE climbs coordinate by coordinate. They all exploit what they've learned so far, which means they can get stuck — not in a local optimum (they're good at escaping those), but in a *path dependence*. The final parameters depend on where they started and which random mutations happened to pay off first.
+
+GridSearch doesn't follow a path. It samples.
+
+### How it works
+
+You have N tunable parameters. Each iteration picks a random 2 or 3 of them — say `roc_period` and `roc_threshold` — and grids them exhaustively. For each parameter, it generates `grid_points` evenly spaced values across the clamp range. If `grid_points=10` and the subspace is 2D, that's 100 points. All 100 backtests run in parallel. The best point becomes the new baseline for the other (non-gridded) parameters.
+
+Next iteration picks a different random subspace — maybe `atr_multiplier` and `position_pct` — and repeats.
+
+Over enough iterations, every pair or triple of parameters gets explored in combination with everything else held at their best known values. The result isn't guaranteed to be the global optimum, but it's not path-dependent. Two runs with the same settings produce the same result.
+
+### Grid margin
+
+By default, the grid spans the full clamp range: from `lo` to `hi` inclusive. The edges of a parameter's range are where overfitting concentrates — LSGA consistently pushes `position_pct` to 1.0 because more risk produces more return in-sample. If you know the edges are dangerous, you can trim them.
+
+`grid_margin` shrinks the effective range on both sides by a fraction of the span. At `grid_margin=0.15`, a parameter with clamps `[0.3, 1.0]` gets searched from `0.3 + 0.15*0.7 = 0.405` to `1.0 - 0.15*0.7 = 0.895`. The interior 70%. The margin is the same for all params — it's a fraction, not an absolute value, so it scales with range width.
+
+### Two-stage pipeline
+
+GridSearch explores. LSGA exploits. They complement each other.
+
+The pattern: run GridSearch for 20-30 iterations to find a promising neighborhood, then feed the best result into LSGA with a low temperature (0.3) for refinement. The grid finds the broad region, LSGA climbs to the peak within it. This consistently finds different (not always better) solutions than LSGA alone.
+
+```python
+from qtradex.optimizers import GridSearch, GridSearchOptions
+from qtradex.optimizers import LSGA, LSGAoptions
+
+# Stage 1: explore
+gs_opts = GridSearchOptions()
+gs_opts.iterations = 20
+gs_opts.grid_margin = 0.15
+grid = GridSearch(data, wallet, gs_opts)
+grid_bots = grid.optimize(bot)
+
+# Stage 2: refine
+best_grid_tune = grid_bots["sortino_ratio"][1].tune
+refine_bot = deepcopy(bot)
+refine_bot.tune = best_grid_tune
+
+lsga_opts = LSGAoptions()
+lsga_opts.temperature = 0.3
+lsga = LSGA(data, wallet, lsga_opts)
+final = lsga.optimize(refine_bot)
+```
+
+### Key options
+
+| Option | Default | What it controls |
+|--------|---------|-----------------|
+| `iterations` | 50 | Number of random subspaces to try. With 7 parameters and 2-param subspaces, 20 iterations covers most pairs once. |
+| `grid_dims` | 2 | Params per subspace. 2 = 100 points/iteration, 3 = 1000 points/iteration. 3 is more thorough but slower. |
+| `grid_points` | 10 | Points per axis. 10 = coarse, 20 = finer but 4x more backtests. With margin=0.15 and 10 points, step size is ~7% of range. |
+| `grid_margin` | 0.0 | Fraction trimmed from each clamp edge. 0.15 = interior 70% only. Keeps search away from boundary overfitting. |
+
+---
+
+## RLPPO — Proximal Policy Optimization (experimental)
+
+Optional dependency: `pip install qtradex[rl]` or `pip install stable-baselines3 gymnasium`.
+
+### Why reinforcement learning?
+
+Every optimizer in QTradeX so far uses hand-crafted search rules. Mutate randomly. Breed the best. Sweep linearly. These rules work because they encode human intuition about what makes a good search: explore when stuck, exploit when ahead, don't revisit bad regions.
+
+But hand-crafted rules have a ceiling. They can't learn. If LSGA's greedy improvement strategy is suboptimal for your specific parameter landscape, it will never discover a better strategy — it will just keep doing greedy improvement.
+
+RLPPO replaces hand-crafted rules with a neural network that learns *how to search* through trial and error.
+
+### How it works
+
+The optimizer wraps the backtest loop as a Gymnasium environment:
+
+```
+obs = normalized tune params + recent performance
+action = delta for each tune parameter (continuous, in [-1, 1])
+reward = composite score (sortino * (1 - max_dd) * min(1, trades/30))
+```
+
+Proximal Policy Optimization (PPO) trains a policy network over thousands of episodes. Each episode is one backtest. The policy observes the current parameter values and outputs a delta: increase `roc_period` by 0.3, decrease `roc_threshold` by 0.02, keep everything else. The environment applies the delta, runs the backtest, and returns the composite score as reward.
+
+Over time, the policy learns which parameter changes tend to produce higher composite scores. It learns interactions: "when `roc_period` is low, a high `roc_threshold` works better" — patterns that hard-coded rules might miss.
+
+### Walk-forward composite
+
+The problem with optimizing on a single data slice: the policy learns to memorize. It finds parameters that work on the training window but collapse out of sample — the same overfitting pattern every optimizer exhibits.
+
+RLPPO addresses this by default with a walk-forward split. The data is divided 2/3 for training and 1/3 for validation. Every episode backtests on both slices independently. The reward is:
+
+```
+reward = 0.7 * composite(train_slice) + 0.3 * composite(val_slice)
+```
+
+The policy must perform on both slices. It can't maximize the training score at the expense of the validation score — that would reduce the weighted reward. The 70/30 split keeps the primary signal on the training data while maintaining pressure toward generalization.
+
+### Where it stands
+
+RLPPO works. It trains successfully — the policy converges, parameters improve, the reward increases over 50,000 timesteps. It found the correct `roc_period=5, roc_threshold=0.1` sweet spot on Pure Momentum in testing.
+
+But it hasn't beaten LSGA yet. The same overfitting problem that plagues every optimizer also plagues RLPPO — the policy learns to widen stops and extend hold times to maximize in-sample returns, then fails on unseen data. The walk-forward composite helps but doesn't eliminate the gap.
+
+The ceiling isn't the RL approach. It's the reward function. The current composite (`sortino * (1 - DD) * trade_mult`) is the same objective every other optimizer uses, so RL has no information advantage. A better reward — one that directly encodes walk-forward consistency or risk-adjusted return — would change that.
+
+### Key options
+
+| Option | Default | What it controls |
+|--------|---------|-----------------|
+| `total_timesteps` | 50000 | Total backtests across training. More = better policy, but each backtest takes wall-clock time. |
+| `walk_forward` | True | Split data 2/3 + 1/3 for train/val composite reward. Disable to train on full data (risks overfit). |
+| `learning_rate` | 3e-4 | PPO learning rate. Standard Adam default. Lower = more stable but slower. |
+| `n_steps` | 512 | Steps collected before each PPO update. Higher = more stable gradients. |
+| `batch_size` | 64 | Minibatch size for PPO updates. |
+| `ent_coef` | 0.01 | Entropy bonus. Higher = more exploration. Lower = more exploitation. |
 
 ---
 
