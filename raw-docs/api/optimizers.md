@@ -1,7 +1,7 @@
 # Optimizers
 
 ```python
-from qtradex.optimizers import QPSO, LSGA, IPSE, AION, MouseWheelTuner
+from qtradex.optimizers import QPSO, LSGA, IPSE, AION, GridSearch, RLPPO, MouseWheelTuner
 ```
 
 All optimizers follow the same interface:
@@ -66,7 +66,7 @@ best = opt.optimize(bot)
 
 ### `LSGA` — Local Search Genetic Algorithm
 
-Genetic algorithm that inherits QPSO internals. Adds a population, crossover, skew-memory penalties, and a walk-forward consistency gate.
+Genetic algorithm that inherits QPSO internals. Adds a population, crossover, walk-forward consistency gate, drawdown gate, directional synapses, and optional momentum / regularization.
 
 ```python
 from qtradex.optimizers import LSGA, LSGAoptions
@@ -82,23 +82,89 @@ best = opt.optimize(bot)
 |-----------|------|---------|-------------|
 | `population` | `int` | 20 | Candidates per generation |
 | `offspring` | `int` | 10 | Offspring generated per generation |
-| `top_ratio` | `float` | 0.05 | Fraction kept as elite |
-| `processes` | `int` | `cpu_count()` | Parallel workers |
+| `top_ratio` | `float` | 0.20 | Fraction kept as elite (higher = more diversity) |
+| `processes` | `int` | `cpu_count() or 3` | Parallel workers |
 | `erode` | `float` | 0.9999 | Candidate erosion rate |
 | `erode_freq` | `int` | 200 | Erosion frequency in iterations |
 | `append_tune` | `str` | `""` | File path to write tunes to |
-| `skew_check_period` | `int` | 2 | Skew-memory check interval (0 = disabled) |
+| `skew_check_period` | `int` | 2 | Skew-memory check interval (set high to disable) |
 | `skew_mc_iterations` | `int` | 70 | Monte Carlo iterations per skew check |
 | `skew_perturbation` | `float` | 0.002 | Perturbation for skew detection |
 | `skew_sigma` | `float` | 0.01 | Skew penalty sigma |
 | `skew_memory_cap` | `int` | 1000 | Max skew-memory entries |
-| `select_data` | `Data` or `None` | `None` | Explicit walk-forward selection dataset |
+| `select_data` | `Data`, `None`, or `False` | `None` | Walk-forward consistency gate. `None` = auto-split (2/3 train + 1/3 select), `Data` = explicit select set, `False` = disable |
 | `consistency_fn` | `callable` or `None` | `None` | Walk-forward consistency function |
-| `consistency_target` | `float` | 3.0 | Target train/select ADR ratio |
+| `consistency_target` | `float` | 1.5 | Target train/select ADR ratio at full intensity |
+| `reg_penalty` | `float` | 0.0 | Ridge penalty for params near clamp edges (e.g. 0.15 = up to 15% penalty at edge) |
+| `acceptance_temp` | `float` | 0.0 | Stochastic acceptance temperature. 0 = deterministic; >0 = probabilistic (filters noise) |
+| `momentum_decay` | `float` | 0.0 | Per-parameter Adam-style momentum. 0 = no momentum; 0.9 = smooth mutation directions across generations |
 
 Overridden defaults from QPSOoptions: `fitness_period=20`, `cyclic_freq=25`, `improvements=10000`, `temperature=1`.
 
-Result dict includes `wf_*` keys with walk-forward consistency metadata when `consistency_fn` is set.
+The result dict includes `wf_culled`, `wf_survived`, and `wf_intensity` keys with walk-through gate metadata. Synapses are now directional and weighted by success score — frequently successful parameter combos are preferred during replay, and mutations are biased toward previously successful directions.
+
+---
+
+### `GridSearch` — Random Subspace Grid Search
+
+Samples random 2- or 3-parameter subspaces exhaustively. Good for exploring the parameter landscape without gradient-following.
+
+```python
+from qtradex.optimizers import GridSearch, GridSearchOptions
+
+opts = GridSearchOptions()
+opt = GridSearch(data, options=opts)
+best = opt.optimize(bot)
+```
+
+**`GridSearchOptions` parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `iterations` | `int` | 50 | Number of random subspaces to try |
+| `grid_dims` | `int` | 2 | Params per subspace (2 or 3) |
+| `grid_points` | `int` | 10 | Points per axis. Total evaluations = `grid_points^grid_dims` (100 for 2D, 1000 for 3D) |
+| `grid_margin` | `float` | 0.0 | Fraction to trim from each clamp edge. 0.15 restricts search to interior 70% of range |
+| `processes` | `int` | `cpu_count() or 4` | Parallel workers |
+| `show_terminal` | `bool` | True | Print progress to terminal |
+| `print_tune` | `bool` | False | Print best tune on completion |
+| `epochs` | `float` | `inf` | Max iterations |
+| `improvements` | `int` | `inf` | Stop after this many improvements |
+
+---
+
+### `RLPPO` — Proximal Policy Optimization (optional)
+
+Reinforcement learning optimizer using PPO (stable-baselines3). Optional dependency: `pip install qtradex[rl]`. Falls back to random search if not installed.
+
+```python
+from qtradex.optimizers import RLPPO, RLPPOoptions
+
+opts = RLPPOoptions()
+opt = RLPPO(data, options=opts)
+best = opt.optimize(bot)
+```
+
+**`RLPPOoptions` parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `total_timesteps` | `int` | 50000 | Total backtests across training |
+| `learning_rate` | `float` | 3e-4 | PPO learning rate |
+| `gamma` | `float` | 0.99 | Discount factor |
+| `gae_lambda` | `float` | 0.95 | GAE lambda for advantage estimation |
+| `clip_range` | `float` | 0.2 | PPO clip range |
+| `ent_coef` | `float` | 0.01 | Entropy bonus (higher = more exploration) |
+| `n_steps` | `int` | 512 | Steps per PPO update |
+| `batch_size` | `int` | 64 | PPO batch size |
+| `n_epochs` | `int` | 10 | Epochs per PPO update |
+| `walk_forward` | `bool` | True | Split data 2/3 + 1/3; reward = 0.7*train + 0.3*val composite |
+| `verbose` | `int` | 1 | SB3 verbosity (0 = silent) |
+| `show_terminal` | `bool` | True | Print progress to terminal |
+| `print_tune` | `bool` | False | Print best tune on completion |
+| `select_data` | `bool` | `False` | No walk-forward split (use `walk_forward` instead) |
+
+The reward function uses a composite score: `sortino * (1 - max_dd) * min(1, trades/30)`. The training environment is a Gymnasium wrapper around the backtest loop.
 
 ---
 

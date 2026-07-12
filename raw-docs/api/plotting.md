@@ -67,7 +67,7 @@ indicator_fmt = [
 | `axes[0]` | Main price axis (log-scale, candle body, trade markers) |
 | `axes[1]` | First indicator subplot (`idx=1`) |
 | `axes[n]` | nth indicator subplot |
-| `axes[-1]` | Balances axis (bottom, log-scale) |
+| `axes[-1]` | Balances axis (bottom, log-scale). Each token (asset and currency) shows continuous total portfolio value — the currency line is `asset_balance * price + currency_balance`, the asset line is `asset_balance + currency_balance / price`. Both move with the market on every candle. |
 
 The engine synchronizes x-limits across all axes. All axes except the last hide x-tick labels.
 

@@ -6,15 +6,15 @@ Every optimizer follows the same loop: tweak the tune, run a backtest, keep resu
 
 ## Which optimizer should you use?
 
-||QPSO|LSGA|IPSE|AION|MouseWheel|
-|---|---|---|---|---|---|
-|Best for|First pass|Overfit prevention|Deterministic search|Expensive backtests|Final polish|
-|Threading|Single|Parallel|Parallel|Single|Single|
-|Overfit protection|No|Walk-forward + skew|No|No|N/A|
-|Deterministic|No|No|Yes|No|N/A|
-|Population|No|Yes|Yes|No|N/A|
+||QPSO|LSGA|IPSE|AION|GridSearch|MouseWheel|
+|---|---|---|---|---|---|---|
+|Best for|First pass|Overfit prevention|Deterministic search|Expensive backtests|Landscape exploration|Final polish|
+|Threading|Single|Parallel|Parallel|Single|Parallel|Single|
+|Overfit protection|No|Walk-forward + DD gate + skew|No|No|No|N/A|
+|Deterministic|No|No|Yes|No|Yes|N/A|
+|Population|No|Yes|Yes|No|Yes|N/A|
 
-Quick rule of thumb: start with **QPSO**. If you see overfitting, switch to **LSGA**. If you want predictable, repeatable results, use **IPSE**. If backtests are slow and you want efficiency, run **AION**. Finish with **MouseWheelTuner** for hand-tuning.
+Quick rule of thumb: start with **QPSO**. If you see overfitting, switch to **LSGA**. If you want predictable, repeatable results, use **IPSE**. If backtests are slow and you want efficiency, run **AION**. To map the landscape coarsely, try **GridSearch**. Finish with **MouseWheelTuner** for hand-tuning.
 
 ---
 
@@ -57,7 +57,7 @@ Every 2500 iterations, all best scores are multiplied by 0.99. They degrade over
 
 ### When to use
 
-LSGA is QPSO with guardrails against overfitting. Use it when you suspect your strategy is fitting to historical noise rather than real patterns. The walk-forward gate and skew memory give it a built-in reality check that QPSO lacks. It's also good when you have multiple cores — the population evaluation can run in parallel.
+LSGA is QPSO with guardrails against overfitting. Use it when you suspect your strategy is fitting to historical noise rather than real patterns. The walk-forward gate, drawdown gate, and skew memory give it a built-in reality check that QPSO lacks. It's also good when you have multiple cores — the population evaluation can run in parallel.
 
 ### What's added
 
@@ -65,17 +65,53 @@ LSGA is QPSO with guardrails against overfitting. Use it when you suspect your s
 
 **Walk-forward consistency.** The data is split 2/3 for training and 1/3 for selection. Every candidate is backtested on both slices. If the training performance is much better than the selection performance, the candidate is culled — it's overfit. The gate relaxes for low-ROI strategies so they're not unfairly eliminated.
 
+**Drawdown gate.** Built into the consistency check. Candidates with excessive drawdown (above an annealed threshold that starts at 80% and tightens to ~35% as candidates improve) on either the train or select slice are culled.
+
+**Directional synapses.** When LSGA records a successful parameter mutation, it doesn't just remember which parameters were changed — it remembers which direction and how often that combination succeeded. Future mutations are biased toward those directions, and frequently successful combinations are preferred during synapse replay.
+
 **Skew memory.** When LSGA finds an improvement, it runs a local sanity check: it perturbs the winning parameters slightly, runs ~70 backtests, and measures the skew of the return distribution. If the region has suspiciously low skew, that region is marked with a penalty. Future candidates near it get their scores suppressed, pushing exploration elsewhere.
 
-**Key differences from QPSO:**
+**Parameter regularization.** Optional ridge penalty (`reg_penalty`) pushes parameters away from clamp boundaries, where overfitting often concentrates. At 0.15, the penalty reduces scores by up to 15% for parameters at their clamp edges.
+
+**Stochastic acceptance.** Optional (`acceptance_temp`). Instead of always accepting an improvement, accept it probabilistically. Small improvements get rejected, preventing LSGA from polishing noise.
+
+**Momentum.** Optional (`momentum_decay`). Per-parameter Adam-style momentum tracking smooths mutation directions across generations, reducing oscillation in noisy landscapes.
+
+### Key differences from QPSO
 
 | Aspect | QPSO | LSGA |
 |--------|------|------|
 | Candidates per iteration | 1 | population (default 20) |
 | Crossover | No | Yes (blend crossover) |
 | Walk-forward gate | No | Yes (train/select split) |
+| Drawdown gate | No | Yes (annealed DD culling) |
+| Directional synapses | No | Yes (weighted, directional) |
 | Anti-overfit memory | No | Yes (skew memory) |
+| Regularization | No | Yes (clamp-boundary penalty) |
+| Stochastic acceptance | No | Yes (noise filter) |
+| Momentum | No | Yes (per-parameter) |
 | Parallel workers | No | Yes (multiprocessing) |
+
+### Quick settings reference
+
+```python
+from qtradex.optimizers import LSGA, LSGAoptions
+
+opts = LSGAoptions()
+
+# Walk-forward gate (default: on, auto-split)
+opts.select_data = False        # disable gate (use full data for training)
+opts.consistency_target = 1.5   # tighten train/select ratio
+
+# Greediness control
+opts.temperature = 0.5          # smaller mutation steps
+opts.acceptance_temp = 0.1       # probabilistic filter: 5% improvement = 50% chance, 1% = 10%
+opts.reg_penalty = 0.15         # penalize params near clamp edges
+
+# Generalization
+opts.momentum_decay = 0.0       # 0.9 for Adam-style momentum
+opts.top_ratio = 0.20           # higher = more diversity (default)
+```
 
 ---
 

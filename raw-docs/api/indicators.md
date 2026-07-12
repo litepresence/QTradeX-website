@@ -181,3 +181,5 @@ fitness(keys, states, raw_states, asset, currency) -> dict
 Orchestrates metric computation. `keys` is a list of metric name strings. Returns `{metric_name: value}`.
 
 Available metric keys: `roi`, `cagr`, `sharpe_ratio`, `sortino_ratio`, `maximum_drawdown`, `calmar_ratio`, `omega_ratio`, `beta`, `alpha`, `info_ratio`, `profit_factor`, `trade_win_rate`, `payoff_ratio`, `skewness`, `kurtosis`, `efficiency_ratio`, `drawdown_duration`, `hurst_exponent`, `dpt` (days per trade with target), `percent_cheats`, `ind:name:low~high` (indicator-based constraint).
+
+`maximum_drawdown` uses a running peak-to-trough calculation, not the global min/max. This correctly handles the case where the portfolio recovers to a new high after a drawdown — the drawdown is measured from the local peak, not from the ultimate global maximum.

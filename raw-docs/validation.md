@@ -106,7 +106,7 @@ The balance curve shows trade markers colored by fill type — green for buys, r
 
 Run QPSO and get 200% ROI. Good.
 
-Now run Monte Carlo. If P5 is below buy & hold, your strategy is fragile. Switch to LSGA, which has built-in overfit protection via walk-forward validation and skew memory. Run Monte Carlo again. Keep iterating until P5 stays above buy & hold.
+Now run Monte Carlo. If P5 is below buy & hold, your strategy is fragile. Switch to LSGA, which has built-in overfit protection via walk-forward validation, an annealed drawdown gate, and skew memory. Run Monte Carlo again. Keep iterating until P5 stays above buy & hold.
 
 Always test on data you did not optimize on. The optimizer saw your full date range. Monte Carlo perturbs parameters but on the same data. The real test is a reserved out-of-sample period — set aside the last 20-30% of your data before optimizing, then run your best parameters against that unseen slice. If performance drops sharply, your strategy is overfit to the optimization window.
 
