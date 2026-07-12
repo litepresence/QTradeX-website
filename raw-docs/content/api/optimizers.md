@@ -253,3 +253,13 @@ result["sharpe"]    # -> (score_dict, best_bot_for_sharpe)
 Each `score_dict` has the metric values for that bot's backtest. Each `best_bot` is a fresh bot instance with the optimal `.tune` set.
 
 `MouseWheelTuner` returns `None`.
+
+### LSGA result metadata
+
+When LSGA runs with the walk-forward consistency gate enabled (`select_data` not `False`), the result dict includes three extra keys alongside the per-metric entries:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `wf_culled` | `int` | Candidates eliminated by the consistency gate |
+| `wf_survived` | `int` | Candidates that passed the gate |
+| `wf_intensity` | `float` | Gate intensity at end of run (0–1, higher = stricter) |

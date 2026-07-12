@@ -46,7 +46,28 @@ Run a historical simulation.
 | `fine_data` | `Data` | `None` | Optional higher-resolution data for fill precision |
 | `always_trade` | `bool` / `str` | `"smart"` | `"smart"` = trade only when elapsed time >= fine candle size; `True` = every tick |
 
-Returns `dict` of performance metrics. If `return_states=True`, returns `[metrics, raw_states, processed_states]`.
+Returns `dict` of performance metrics. Depending on your bot's `fitness()` method, this includes:
+
+| Key | Description |
+|-----|-------------|
+| `roi` | Portfolio multiplier (1.0 = breakeven, 2.0 = +100%) |
+| `cagr` | Compound annual growth rate |
+| `sharpe_ratio` | Risk-adjusted return (risk-free rate benchmark) |
+| `sortino_ratio` | Downside risk-adjusted return |
+| `maximum_drawdown` | Maximum peak-to-trough loss (0.0–1.0) |
+| `trade_win_rate` | Fraction of winning trades |
+| `calmar_ratio` | CAGR / max drawdown |
+| `omega_ratio` | Probability-weighted gain/loss ratio |
+| `profit_factor` | Gross profit / gross loss |
+| `payoff_ratio` | Average win / average loss |
+| `skewness` | Return distribution asymmetry |
+| `kurtosis` | Return distribution tail thickness |
+| `dpt` | Days per trade |
+| `composite` | Custom metric from your bot's `fitness()` extras |
+
+Plus any custom keys returned by your bot's `fitness()` extras dict.
+
+If `return_states=True`, returns `[metrics, raw_states, processed_states]` where `raw_states` contains the full trade history and balance curve.
 
 ## `qx.papertrade()`
 
