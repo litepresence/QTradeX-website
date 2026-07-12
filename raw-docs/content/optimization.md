@@ -241,7 +241,7 @@ final = lsga.optimize(refine_bot)
 
 | Option | Default | What it controls |
 |--------|---------|-----------------|
-| `iterations` | 50 | Number of random subspaces to try. With 7 parameters and 2-param subspaces, 20 iterations covers most pairs once. |
+| `iterations` | 50 | Number of random subspaces to try. With N parameters and 2-param subspaces, 20 iterations covers most pairs once. |
 | `grid_dims` | 2 | Params per subspace. 2 = 100 points/iteration, 3 = 1000 points/iteration. 3 is more thorough but slower. |
 | `grid_points` | 10 | Points per axis. 10 = coarse, 20 = finer but 4x more backtests. With margin=0.15 and 10 points, step size is ~7% of range. |
 | `grid_margin` | 0.0 | Fraction trimmed from each clamp edge. 0.15 = interior 70% only. Keeps search away from boundary overfitting. |
@@ -288,11 +288,11 @@ The policy must perform on both slices. It can't maximize the training score at 
 
 ### Where it stands
 
-RLPPO works. It trains successfully — the policy converges, parameters improve, the reward increases over 50,000 timesteps. It found the correct `roc_period=5, roc_threshold=0.1` sweet spot on Pure Momentum in testing.
+RLPPO trains successfully. The policy converges, parameters improve, the reward increases over 50,000 timesteps. It can find the same high-performing parameter regions that LSGA finds.
 
-But it hasn't beaten LSGA yet. The same overfitting problem that plagues every optimizer also plagues RLPPO — the policy learns to widen stops and extend hold times to maximize in-sample returns, then fails on unseen data. The walk-forward composite helps but doesn't eliminate the gap.
+But it hasn't beaten LSGA yet. The same overfitting problem that plagues every optimizer also plagues RLPPO — the policy learns to maximize in-sample returns by widening stops and extending hold times, then fails on unseen data. The walk-forward composite (70% train + 30% validation) helps but doesn't eliminate the gap.
 
-The ceiling isn't the RL approach. It's the reward function. The current composite (`sortino * (1 - DD) * trade_mult`) is the same objective every other optimizer uses, so RL has no information advantage. A better reward — one that directly encodes walk-forward consistency or risk-adjusted return — would change that.
+The ceiling isn't the RL approach. It's the reward function. The default composite (`sortino * (1 - max_dd) * min(1, trades/30)`) is the same objective every other optimizer uses, so RL has no information advantage. A better reward — one that directly encodes walk-forward consistency or risk-adjusted return across multiple time windows — would change that. The infrastructure is ready; the reward design is the open problem.
 
 ### Key options
 
