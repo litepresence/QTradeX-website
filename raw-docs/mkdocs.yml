@@ -1,6 +1,6 @@
 site_name: QTradeX Docs
 site_url: https://qtradex.litepresence.com/docs/
-docs_dir: .
+docs_dir: content
 site_dir: ../dist/docs
 use_directory_urls: true
 
@@ -19,7 +19,7 @@ theme:
         name: Switch to dark mode
 
 extra_css:
-  - extra.css
+  - ../extra.css
 
 markdown_extensions:
   - pymdownx.highlight
